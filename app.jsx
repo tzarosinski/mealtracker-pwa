@@ -68,7 +68,6 @@ const calculateStreakData = (meals) => {
     let shieldProgress = 0;
     let lastMeal = null;
     let yellowCountToday = 0;
-    let lastYellowDate = null;
     
     sortedMeals.forEach((meal, index) => {
         const mealDate = getDateKey(meal.date);
@@ -110,7 +109,10 @@ const calculateStreakData = (meals) => {
                 consecutiveGreens = 0;
                 shieldProgress = 0;
             }
-        } else if (meal.rating === 'green') {
+        }
+        
+        // Process meal based on rating
+        if (meal.rating === 'green') {
             // Green meal - increment streak and calculate coins
             currentStreak++;
             consecutiveGreens++;
@@ -131,6 +133,12 @@ const calculateStreakData = (meals) => {
             
             // Reset yellow count on green
             yellowCountToday = 0;
+        } else if (meal.rating === 'yellow' && !streakBreak) {
+            // Yellow meal that doesn't break streak
+            // Streak continues but no coins earned
+            // Don't increment currentStreak
+            consecutiveGreens = 0;
+            shieldProgress = 0;
         }
         
         lastMeal = meal;
@@ -518,12 +526,15 @@ const App = () => {
 
     // Save meals and recalculate streak whenever meals change
     useEffect(() => {
+        console.log('Meals changed, count:', meals.length);
+        
         if (meals.length > 0 || localStorage.getItem(STORAGE_KEY)) {
             saveMeals(meals);
         }
         
         // Recalculate streak data
         const newStreakData = calculateStreakData(meals);
+        console.log('New streak data:', newStreakData);
         setStreakData(newStreakData);
         
         // Check for shield earned
