@@ -1,0 +1,4 @@
+This file represents a 512x512 app icon placeholder.
+For a production app, replace with an actual PNG icon.
+You can create one using any image editor or online tool.
+Suggested design: Orange/red flame icon on white background.
