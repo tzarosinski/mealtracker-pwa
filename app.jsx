@@ -167,12 +167,12 @@ const loadMeals = () => {
 };
 
 // Components
-const StreakView = ({ streakData, showShieldNotification }) => {
+const StreakView = ({ streakData, showShieldNotification, onInfoClick }) => {
     const flameStyle = getFlameColor(streakData.currentStreak);
     
     return (
         <div className="streak-container-sticky">
-            <div className="stats-group">
+            <div className="stats-group" onClick={onInfoClick} style={{ cursor: 'pointer' }}>
                 {/* Coins */}
                 <div className="coin-badge">
                     <span className="coin-icon">🪙</span>
@@ -192,6 +192,9 @@ const StreakView = ({ streakData, showShieldNotification }) => {
                     </span>
                     <span className="streak-count">{streakData.currentStreak}</span>
                 </div>
+                
+                {/* Info icon */}
+                <div className="info-icon">ℹ️</div>
             </div>
             
             {/* Shield Status */}
@@ -215,6 +218,89 @@ const StreakView = ({ streakData, showShieldNotification }) => {
                     </div>
                 </div>
             )}
+        </div>
+    );
+};
+
+const StreakInfoModal = ({ show, onClose, streakData }) => {
+    if (!show) return null;
+
+    const handleOverlayClick = (e) => {
+        if (e.target === e.currentTarget) {
+            onClose();
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={handleOverlayClick}>
+            <div className="modal-content info-modal">
+                <div className="modal-header">
+                    <button className="modal-close" onClick={onClose}>✕</button>
+                    <h2 className="modal-title">How It Works</h2>
+                    <div style={{ width: '40px' }}></div>
+                </div>
+                <div className="modal-body">
+                    <div className="info-section">
+                        <h3 className="info-title">🪙 Earning Coins</h3>
+                        <p className="info-text">
+                            Green meals earn you coins! You get <strong>1 base coin</strong> plus <strong>bonus coins</strong> equal to your current streak minus 1.
+                        </p>
+                        <div className="info-examples">
+                            <div>1st green → 1 coin</div>
+                            <div>2nd green → 2 coins (1 + 1 bonus)</div>
+                            <div>5th green → 5 coins (1 + 4 bonus)</div>
+                            <div>10th green → 10 coins (1 + 9 bonus)</div>
+                        </div>
+                        <p className="info-note">Yellow and red meals earn 0 coins.</p>
+                    </div>
+
+                    <div className="info-section">
+                        <h3 className="info-title">🔥 Streak Rules</h3>
+                        <p className="info-text">
+                            Your streak grows with consecutive green meals. It breaks if:
+                        </p>
+                        <ul className="info-list">
+                            <li>You log a red meal</li>
+                            <li>You log 2+ yellow meals in the same day</li>
+                            <li>You log yellow meals on consecutive meals across days</li>
+                        </ul>
+                        <p className="info-note">One yellow meal is OK - your streak continues!</p>
+                    </div>
+
+                    <div className="info-section">
+                        <h3 className="info-title">🛡️ Streak Shield</h3>
+                        <p className="info-text">
+                            Log <strong>7 consecutive green meals</strong> to earn a protective shield!
+                        </p>
+                        <ul className="info-list">
+                            <li>Shield saves you once from any streak-ending event</li>
+                            <li>Max 1 shield at a time</li>
+                            <li>After use, log 7 more greens to earn another</li>
+                            <li>Bonus coins continue while rebuilding shield</li>
+                        </ul>
+                    </div>
+
+                    <div className="info-section current-stats">
+                        <h3 className="info-title">📊 Your Current Stats</h3>
+                        <div className="stats-display">
+                            <div className="stat-item">
+                                <span className="stat-label">Coins:</span>
+                                <span className="stat-value">{streakData.totalCoins} 🪙</span>
+                            </div>
+                            <div className="stat-item">
+                                <span className="stat-label">Streak:</span>
+                                <span className="stat-value">{streakData.currentStreak} 🔥</span>
+                            </div>
+                            <div className="stat-item">
+                                <span className="stat-label">Shield:</span>
+                                <span className="stat-value">
+                                    {streakData.hasShield ? 'Active! 🛡️' : `${streakData.shieldProgress}/7`}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };
@@ -409,22 +495,46 @@ const App = () => {
     const [meals, setMeals] = useState([]);
     const [showMealLog, setShowMealLog] = useState(false);
     const [showDayDetail, setShowDayDetail] = useState(false);
+    const [showStreakInfo, setShowStreakInfo] = useState(false);
     const [selectedDate, setSelectedDate] = useState(null);
     const [editingMeal, setEditingMeal] = useState(null);
     const [showShieldNotification, setShowShieldNotification] = useState(false);
     const [prevStreakData, setPrevStreakData] = useState(null);
+    const [streakData, setStreakData] = useState({
+        currentStreak: 0,
+        totalCoins: 0,
+        hasShield: false,
+        shieldProgress: 0,
+        consecutiveGreens: 0
+    });
     const gridRef = useRef(null);
 
     // Load meals on mount
     useEffect(() => {
-        setMeals(loadMeals());
+        const loadedMeals = loadMeals();
+        setMeals(loadedMeals);
+        setStreakData(calculateStreakData(loadedMeals));
     }, []);
 
-    // Save meals whenever they change
+    // Save meals and recalculate streak whenever meals change
     useEffect(() => {
         if (meals.length > 0 || localStorage.getItem(STORAGE_KEY)) {
             saveMeals(meals);
         }
+        
+        // Recalculate streak data
+        const newStreakData = calculateStreakData(meals);
+        setStreakData(newStreakData);
+        
+        // Check for shield earned
+        if (prevStreakData && !prevStreakData.hasShield && newStreakData.hasShield) {
+            setShowShieldNotification(true);
+            setTimeout(() => {
+                setShowShieldNotification(false);
+            }, 3000);
+        }
+        
+        setPrevStreakData(newStreakData);
     }, [meals]);
 
     // Scroll to today on mount
@@ -435,21 +545,6 @@ const App = () => {
             }, 100);
         }
     }, []);
-
-    // Check for shield earned
-    useEffect(() => {
-        const currentData = calculateStreakData(meals);
-        
-        if (prevStreakData && !prevStreakData.hasShield && currentData.hasShield) {
-            // Shield just earned!
-            setShowShieldNotification(true);
-            setTimeout(() => {
-                setShowShieldNotification(false);
-            }, 3000);
-        }
-        
-        setPrevStreakData(currentData);
-    }, [meals]);
 
     const getMealsForDate = (date) => {
         return meals
@@ -512,14 +607,22 @@ const App = () => {
         setSelectedDate(null);
     };
 
+    const handleStreakInfoClick = () => {
+        setShowStreakInfo(true);
+    };
+
+    const handleCloseStreakInfo = () => {
+        setShowStreakInfo(false);
+    };
+
     const gridDates = getGridDates();
-    const streakData = calculateStreakData(meals);
 
     return (
         <div className="app-container">
             <StreakView 
                 streakData={streakData} 
                 showShieldNotification={showShieldNotification}
+                onInfoClick={handleStreakInfoClick}
             />
             
             <div className="grid-container" ref={gridRef}>
@@ -560,6 +663,12 @@ const App = () => {
                 onClose={handleCloseDayDetail}
                 onEdit={handleEditMeal}
                 onDelete={handleDeleteMeal}
+            />
+
+            <StreakInfoModal
+                show={showStreakInfo}
+                streakData={streakData}
+                onClose={handleCloseStreakInfo}
             />
         </div>
     );
